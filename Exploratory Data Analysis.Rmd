@@ -1,0 +1,236 @@
+---
+title: "Exploratory Data Analysis"
+author: "Varun Bansal"
+output: pdf_document
+date: "2023-01-18"
+---
+
+## Setting the work directory. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE)
+options(scipen=9)
+knitr::opts_chunk$set(fig.width=9, fig.height=7,
+                      fig.path='Figs/', echo = TRUE)
+#This sets the working directory
+knitr::opts_knit$set(root.dir = 'C:/Users/varun/OneDrive/Desktop/R/datasets')
+
+```
+
+
+## Loading and attaching all the necessary packages.
+
+```{r}
+#Load packages
+
+if(!require(tinytex)){
+  install.packages("tinytex")
+  }
+library("tinytex")
+
+if (!require(dplyr)) {
+  install.packages("dplyr")
+  library(dplyr)
+}
+
+```
+
+
+
+## Basic Manipulation
+
+## Reading the text file and changing it to a data frame
+
+```{r}
+df <- read.csv("Data_Centers.txt", header = TRUE, sep = ",")
+```
+
+## Append the initials to all variables in the data frame 
+
+```{r}
+df_VB <- df
+colnames(df_VB) <- paste(colnames(df_VB), "VB", sep = "_")
+head(df_VB, 5)
+```
+
+
+## Changing each character variable to a factor variable
+
+```{r}
+# Changing each character variable to factor variable
+df_VB <- as.data.frame(unclass(df_VB), stringsAsFactors = TRUE)
+
+str(df_VB)
+```
+
+## Checking dimensions of the dataset
+
+```{r}
+dim(df_VB)
+```
+The dataset is of dimension 90000 x 6 (90000 rows and 6 columns)
+
+
+## Summarizing Data
+
+## Means and Standard Deviations for Server Message Blocks Received.
+
+```{r}
+mean_smbr_VB <- mean(df_VB$SMBR_VB)
+paste("Mean of Server Message Blocks Received:", mean_smbr_VB)
+
+sd_smbr_VB <- sd(df_VB$SMBR_VB)
+paste("Standard Deviation of Server Message Blocks Received:", sd_smbr_VB)
+```
+
+
+## Calculating the coefficient of variation.
+
+```{r}
+cv_smbr_VB <- round((sd_smbr_VB / mean_smbr_VB) * 100, 3)
+paste("Coefficient of variation of Server Message Blocks Received:", cv_smbr_VB)
+```
+
+## Calculating the mean and standard deviation for Server Message Blocks Transmitted.
+
+```{r}
+mean_smbt_VB <- mean(df_VB$SMBT_VB)
+paste("Mean of Server Message Blocks Transmitted:", mean_smbt_VB)
+
+sd_smbt_VB <- sd(df_VB$SMBT_VB)
+paste("Standard Deviation of Server Message Blocks Transmitted:", sd_smbt_VB)
+```
+
+
+## Calculating the coefficient of variation (rounded to 3 decimal places).
+
+```{r}
+cv_smbt_VB <- round((sd_smbt_VB / mean_smbt_VB) * 100, 3)
+paste("Coefficient of variation of Server Message Blocks Transmitted:", cv_smbt_VB)
+```
+
+
+## Looking for which variable has more variation (SMBT or SMBR) 
+
+```{r}
+max(cv_smbr_VB,cv_smbt_VB)
+```
+SMBT has more variation, as coefficient of variation of SMBT is double the coefficient of variation of SMBR.
+
+
+## Organizing Data
+
+## Summary Table
+
+## Table showing the average Server Message Blocks Transmitted by Manufacturer.
+
+```{r}
+avg_smbt_df_VB <- aggregate(df_VB$SMBT_VB, by=list(df_VB$Manufacturer_VB), 
+                            FUN=function(x) round(mean(x), 2))
+colnames(avg_smbt_df_VB) <- c("Manufacturer", "AverageSMBT")
+avg_smbt_df_VB
+```
+
+
+## Looking for which Manufacturer’s Servers have, on average, transmitted the most server message blocks.
+
+```{r}
+head( avg_smbt_df_VB[order(avg_smbt_df_VB$AverageSMBT, decreasing = TRUE), ], 1)
+```
+Lled has transmitted the most server message blocks on an average.
+
+
+
+##  Cross Tabulation
+##  Table counting all Servers by Data Centre.
+
+```{r}
+table_servers_by_DC_VB <- table(df_VB$Server_VB, df_VB$DC_VB)
+count_servers_by_DC_VB <-margin.table(table_servers_by_DC_VB, 2)
+count_servers_by_DC_VB
+```
+
+
+## Changing the table to show the percentage of each Server in each Data Centre.
+
+```{r}
+percentage_servers_by_DC_VB <- round((prop.table(count_servers_by_DC_VB))*100,3)
+percentage_servers_by_DC_VB
+```
+
+# Data Visualization
+
+## Bar Plot
+## Bar plot of count of Servers Models.
+
+```{r}
+
+# Counting no. of servers for each server.
+df_table_VB <- table(df_VB$Server_VB)
+
+# Ordering by highest count of Server Model
+df_table_VB <- df_table_VB[order(df_table_VB,decreasing=TRUE)]             
+
+# Creating the bar plot of count of Servers Models
+barplot(df_table_VB,
+        col=55,
+        density = 70, angle = 90,
+        main="Bar Plot of count of Servers Models",
+        xlab = "Servers",
+        ylab = "Count of Server Models",
+        ylim = range(df_table_VB)
+        )
+
+```
+
+
+## Histogram
+## Histogram of Server Message Blocks Transmitted.
+
+```{r}
+
+hist(df_VB$SMBT_VB,
+     col=2,
+     breaks=10,
+     xlab="Range of SMBT",
+     ylab="Count of SMBT",
+     main="Histogram of Server Message Blocks Transmitted")
+```
+
+
+
+## Box plot
+## Horizontal box plot of number of Connections Made.
+
+
+```{r}
+boxplot(df_VB$Conn_VB, 
+        main="Box Plot of number of Connections Made",
+        xlab="Connections Made",
+        col=19,
+        horizontal=TRUE,
+        pch=3)
+
+```
+
+
+## Scatter Plot
+## Scatter plot comparing Server Message Blocks Transmitted and Connections Made.
+
+```{r}
+
+plot(df_VB$SMBT_VB ~ df_VB$Conn_VB,
+     data=df_VB,
+     col=2,
+     pch=1,
+     main="Scatter plot comparing SMBT and Connections Made",
+     xlab="Server Message Blocks Transmitted",
+     ylab="Connections Made")
+
+```
+  
+Server Message Blocks Transmitted and Connections Made have a linear relationship. It looks like it has a  moderate positive correlation.
+
+
+
+

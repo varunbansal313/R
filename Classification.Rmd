@@ -1,0 +1,568 @@
+---
+title: "Data Analysis - Classification"
+author: "Varun Bansal"
+output:
+  pdf_document:
+    latex_engine: xelatex
+date: "2023-04-01"
+---
+
+
+### Setting the work directory. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE)
+options(scipen=9)
+knitr::opts_chunk$set(fig.width=9, fig.height=7,
+                      fig.path='Figs/', echo = TRUE)
+#This sets the working directory
+knitr::opts_knit$set(root.dir = 'C:/Users/varun/OneDrive/Desktop/R/datasets')
+
+rm(list = ls())
+
+```
+
+
+### Loading and attaching all the necessary packages.
+
+```{r}
+#Load packages
+
+if(!require(tinytex)){install.packages("tinytex")
+  library("tinytex")
+}
+
+if (!require(lattice)) {install.packages("lattice")
+  library(lattice)
+}
+
+if (!require(gridExtra)) {install.packages("gridExtra")
+  library(gridExtra)
+}
+
+if(!require(corrgram)){install.packages("corrgram")
+  library("corrgram")
+}
+
+if (!require(corrplot)) {install.packages("corrplot")
+  library(corrplot)
+}
+
+if(!require(pastecs)){install.packages("pastecs")
+  library("pastecs")
+}
+
+if(!require(vcd)){install.packages("vcd")
+  library("vcd")
+}
+
+if(!require(HSAUR)){install.packages("HSAUR")
+  library("HSAUR")
+}
+
+if(!require(rmarkdown)){install.packages("rmarkdown")
+  library("rmarkdown")
+}
+
+if(!require(ggplot2)){install.packages("ggplot2")
+  library("ggplot2")
+}
+
+if(!require(polycor)){install.packages("polycor")
+  library("polycor")
+}
+
+if(!require(klaR)){install.packages("klaR")
+  library("klaR")
+}
+
+if(!require(MASS)){install.packages("MASS")
+  library("MASS")
+}
+
+if(!require(partykit)){install.packages("partykit")
+  library("partykit")
+}
+
+if(!require(nnet)){install.packages("nnet")
+  library("nnet")
+}
+
+if(!require(caret)){install.packages("caret")
+  library(caret)
+}
+
+```
+
+# Reading file
+
+```{r}
+
+# Reading File
+
+df <- read.csv("Mail_Order_Delivery_Time.txt", header = TRUE, sep = ",")
+head(df, 5)
+
+```
+
+
+# Preliminary Data Preparation
+
+## Renaming all variables with my initials appended.
+
+```{r}
+
+# Appending initials to all variables in the data frame 
+
+df_VB <- df
+colnames(df_VB) <- paste(colnames(df_VB), "VB", sep = "_")
+head(df_VB, 5)
+
+```
+
+
+## As the dataset is same as that we used building Murltivariate Linear Rgression model, we will not do the regular descriptive analysis and outlier detection. We will just delete the observation with PG <0.
+
+Deleting the observation with PG <0 
+```{r}
+
+df_VB <- df_VB[!df_VB$PG_VB < 0,]
+
+```
+
+
+## Creating a new variable in the dataset called OT_VB which will have a value of 1 if DL ≤ 8.5 and 0 otherwise.
+
+Creating a new variable OT_VB.
+```{r}
+
+df_VB$OT_VB <- as.factor(ifelse(df_VB$DL_VB <= 8.5, 1,0))
+
+```
+
+Removing the first Column, DL.
+```{r}
+
+df_VB <- df_VB[,-1]
+
+```
+
+
+Changing each character variable to factor variable
+```{r}
+
+df_VB <- as.data.frame(unclass(df_VB), stringsAsFactors = TRUE)
+
+```
+
+```{r}
+str(df_VB)
+```
+
+
+# Exploratory Analysis
+## Checking Correlations
+
+Looking for correlations using pairs function.
+```{r}
+
+pairs(df_VB[sapply(df_VB,is.numeric)], pch=46)
+
+```
+There doesn't seem to be any co-linear variables. But we will check it using hetcor function.
+
+```{r}
+
+ht <- hetcor(df_VB)  #from polycor library
+round(ht$correlations,2)
+  
+```
+The correlation coefficient between OT_VB and PG_VB is -0.50, which indicates a moderate negative correlation between these two variables. Generally, a correlation coefficient of 0.7 or higher is considered to indicate high collinearity between two variables. So we say there are no co-linear variables.
+
+
+
+# Model Development
+
+### Spittling the data in train and test
+
+```{r}
+# Choosing the sampling rate
+sr <- 0.8
+
+# Find the number of rows of data
+n.row <- nrow(df_VB)
+
+#Choose the rows for the traning sample 
+
+set.seed(5021)
+training.rows <- sample(1:n.row, sr*n.row, replace=FALSE)
+
+#Assign to the training sample
+
+train_VB <- subset(df_VB[training.rows,])
+
+# Assign the balance to the Test Sample
+
+test_VB <- subset(df_VB[-c(training.rows),])
+```
+
+## Creating a full model using all of the variables.
+
+```{r}
+del_glm_VB = glm(OT_VB ~ . ,
+                family="binomial", data=df_VB, na.action=na.omit)
+```
+
+```{r}
+summary(del_glm_VB)
+```
+```{r}
+r <- residuals(del_glm_VB)
+plot(r)
+```
+
+MODEL SUMMARY  
+  
+    
+(1) Fisher iterations:
+The output indicates that the algorithm converged after 5 iterations.
+
+(2) AIC:
+A lower AIC value indicates a better fit of the model to the data. In this case, the AIC value is 499.4, which is relatively low, suggesting a good fit of the model to the data.
+
+(3) Residual Deviance:
+A lower residual deviance indicates a better fit of the model to the data. In this case, the residual deviance is 481.40, which is lower than the null deviance of 672.92, suggesting that the model explains a significant proportion of the variation in the data.
+
+(4) Residual symmetry:
+Observing the residual plot, we see that residuals are symmetrically distributed around zero.
+
+(5) z-values:
+Some variables such as PG_VB, HZ_VBN, and CR_VBSup Del have high absolute z-values, indicating that they are significant predictors of the outcome variable.
+
+(6) Parameter Coefficients:
+Variables such as PG_VB, ML_VB, HZ_VBN, CR_VBSup Del, and WT_VB have statistically significant coefficients. They are likely to be important predictors of the outcome variable OT_VB.
+
+
+## Creating an additional model using backward selection.
+
+```{r}
+stp_del_glm_VB <- step(del_glm_VB)
+```
+
+```{r}
+summary(stp_del_glm_VB)
+```
+```{r}
+r <- residuals(stp_del_glm_VB)
+plot(r)
+```
+
+MODEL SUMMARY  
+  
+  
+(1) Fisher iterations:
+The output indicates that the algorithm converged after 5 iterations.
+
+(2) AIC:
+A lower AIC value indicates a better fit of the model to the data. In this case, the AIC value is 495.49, which is relatively low, suggesting a good fit of the model to the data.
+
+(3) Residual Deviance:
+A lower residual deviance indicates a better fit of the model to the data. In this case, the residual deviance is 481.49, which is lower than the null deviance of 672.92, suggesting that the model explains a significant proportion of the variation in the data.
+
+(4) Residual symmetry:
+Observing the residual plot, we see that residuals are symmetrically distributed around zero.
+
+(5) z-values:
+Some variables such as PG_VB, HZ_VBN, and CR_VBSup Del have high absolute z-values, indicating that they are significant predictors of the outcome variable.
+
+(6) Parameter Coefficients:
+Variables such as PG_VB, ML_VB, HZ_VBN, CR_VBSup Del, and WT_VB have statistically significant coefficients. They are likely to be important predictors of the outcome variable OT_VB.
+
+
+
+## Analyzing the output for any significantly influential datapoints.
+
+```{r}
+par(mfrow = c(2, 2))  
+plot(del_glm_VB)  
+par(mfrow = c(1, 1)) 
+```
+
+```{r}
+plot(stp_del_glm_VB,which=4, id.n=6)
+```
+
+Some of the influential points include :7, 39, 40, 143, 208, 319. These indicate that specific observations in our dataset that have a significant impact on the model fit. These observations have high leverage and/or large standardized residuals, which means they have a large influence on the estimated regression coefficients and model fit.
+
+
+## Recommending the model that should be selected.
+
+The AIC of Model 2 (495.49) is lower than that of Model 1 (499.4)
+The residual deviance of Model 1 and 2 are almost same.
+The higher z values indicate a more significant predictor varaibles.
+The residuals of both the models are symmetrically distributed around zero.
+So we conclude that Model 2 is slightly better than Model 1. 
+
+
+------------------------------------------------------------------------------------------
+
+# Creating more classifiers 
+
+# 1. Logistic Regression – stepwise
+## Using the step option in the glm function to fit the model.
+
+```{r}
+
+# Fitting the logistic regression model with stepwise selection
+start_time <- Sys.time() # starting the timer
+logit_VB <- glm(OT_VB ~ ., data = train_VB, family = "binomial", na.action=na.omit)
+logit_stepwise_VB <- step(logit_VB, direction = "both", trace=FALSE)
+end_time <- Sys.time() # ending the timer
+
+```
+
+
+## Summarizing the results in Confusion Matrices for both train and test sets.
+
+```{r}
+
+# Predicting the classes for the training set and the test set
+train_pred <- predict(logit_stepwise_VB, train_VB, type = "response")
+test_pred <- predict(logit_stepwise_VB, test_VB, type = "response")
+
+# Create confusion matrices for both the training set and the test set
+train_cm <- table(train_VB$OT_VB, train_pred > 0.5)
+test_cm <- table(test_VB$OT_VB, test_pred > 0.5)
+
+
+# Calculate the time it took to fit the model
+fit_time <- end_time - start_time
+
+cat("Train Confusion Matrix:\n")
+print(train_cm)
+cat("Test Confusion Matrix:\n")
+print(test_cm)
+cat("\nModel fit time (in seconds):", fit_time, "\n")
+```
+
+Train set:
+
+Accuracy: 0.757  
+Misclassification Rate: 0.242  
+Precision: 0.763  
+Sensitivity: 0.792  
+Specificity: 0.718 
+Balanced Accuracy: 0.755  
+      
+      
+
+Test set:
+
+Accuracy: 0.673  
+Misclassification Rate: 0.326  
+Precision: 0.635  
+Sensitivity: 0.717  
+Specificity: 0.635  
+Balanced Accuracy: 0.676  
+
+
+# 2. Naïve-Bayes Classification
+
+```{r}
+
+# Fitting the Naïve-Bayes Classification model
+start_time <- Sys.time() # starting the timer
+nb_VB <- NaiveBayes(OT_VB ~ ., data = train_VB, na.action=na.omit)
+end_time <- Sys.time() # ending the timer
+
+```
+
+
+## Summarizing the results in Confusion Matrices for both train and test sets.
+
+```{r, warning=FALSE}
+
+# Predicting the classes for the training set and the test set
+train_pred <- predict(nb_VB, train_VB)
+test_pred <- predict(nb_VB, test_VB)
+
+# Creating confusion matrices for both the training set and the test set
+train_cm <- table(Actual=train_VB$OT_VB, Predicted=train_pred$class)
+test_cm <- table(Actual=test_VB$OT_VB, Predicted=test_pred$class)
+
+
+# Calculating the time it took to fit the model
+fit_time <- end_time - start_time
+
+cat("Train Confusion Matrix:\n\n")
+print(train_cm)
+cat("\n\nTest Confusion Matrix:\n\n")
+print(test_cm)
+cat("\nModel fit time (in seconds):", fit_time, "\n")
+```
+Train set:
+
+Accuracy: 0.76  
+Misclassification Rate: 0.24  
+Precision: 0.761  
+Sensitivity: 0.802  
+Specificity: 0.713  
+Balanced Accuracy: 0.757  
+
+
+Test set:
+
+Accuracy: 0.693  
+Misclassification Rate: 0.306  
+Precision: 0.660  
+Sensitivity: 0.717  
+Specificity: 0.673  
+Balanced Accuracy: 0.695  
+
+# 3. Recursive Partitioning Analysis
+
+```{r}
+
+# Fitting the model using Recursive Partitioning Analysis
+start_time <- Sys.time() # start the timer
+rpa_VB <- ctree(OT_VB ~ ., data = train_VB)
+end_time <- Sys.time() # end the timer
+
+```
+
+```{r}
+plot(rpa_VB, gp=gpar(fontsize=8))
+```
+
+
+## Summarizing the results in Confusion Matrices for both train and test sets.
+
+```{r, warning=FALSE}
+
+# Predicting the classes for the training set and the test set
+train_pred <- predict(rpa_VB, train_VB)
+test_pred <- predict(rpa_VB, test_VB)
+
+# Creating confusion matrices for both the training set and the test set
+train_cm <- table(Actual=train_VB$OT_VB, Predicted=train_pred)
+test_cm <- table(Actual=test_VB$OT_VB, Predicted=test_pred)
+
+
+# Calculating the time it took to fit the model
+fit_time <- end_time - start_time
+
+cat("Train Confusion Matrix:\n\n")
+print(train_cm)
+cat("\n\nTest Confusion Matrix:\n\n")
+print(test_cm)
+cat("\nModel fit time (in seconds):", fit_time, "\n")
+```
+Train set:
+
+Accuracy: 0.752  
+Misclassification Rate: 0.247  
+Precision: 0.813  
+Sensitivity: 0.696   
+Specificity: 0.818  
+Balanced Accuracy: 0.757  
+
+Test set:
+
+Accuracy: 0.673  
+Misclassification Rate: 0.326  
+Precision: 0.667  
+Sensitivity: 0.609  
+Specificity: 0.731  
+Balanced Accuracy: 0.670  
+
+
+## 4. Neural Network classification model
+
+```{r}
+# Fit the model using Neural Network
+start_time <- Sys.time() # start the timer
+set.seed(8430)
+fit <- nnet(OT_VB ~ .,
+          data=train_VB,
+          size=3,
+          rang=0.1,
+          maxit=1200,
+          trace=FALSE)
+end_time <- Sys.time() # end the timer
+```
+
+
+## Summarizing the results in Confusion Matrices for both train and test sets.
+
+```{r, warning=FALSE}
+
+# Predicting the classes for the training set and the test set
+train_pred <- predict(fit, newdata=train_VB, type="class")
+test_pred <- predict(fit, newdata=test_VB, type="class")
+
+# Creating confusion matrices for both the training set and the test set
+train_cm <- table(Actual=train_VB$OT_VB, Predicted=train_pred)
+test_cm <- table(Actual=test_VB$OT_VB, Predicted=test_pred)
+
+
+# Calculating the time it took to fit the model
+fit_time <- end_time - start_time
+
+cat("Train Confusion Matrix:\n\n")
+print(train_cm)
+cat("\n\nTest Confusion Matrix:\n\n")
+print(test_cm)
+cat("\nModel fit time (in seconds):", fit_time, "\n")
+```
+Train set:
+
+Accuracy: 0.755  
+Misclassification Rate: 0.245  
+Precision: 0.736  
+Sensitivity: 0.74  
+Specificity: 0.768  
+Balanced Accuracy: 0.754  
+
+
+Test set:
+
+Accuracy: 0.714  
+Misclassification Rate: 0.286  
+Precision: 0.673  
+Sensitivity: 0.761  
+Specificity: 0.673  
+Balanced Accuracy: 0.714  
+
+
+# Comparing All Classifiers
+
+## Comparing Accuracy
+
+To determine which classifier is most accurate, we will compare the test accuracy of each model. 
+Looking at the test confusion matrix, the accuracy of models are:
+Model 1 Logistic Regression - stepwise = 67%. 
+Model 2 Naïve-Bayes Classification has an accuracy of =  69%. 
+Model 3 Recursive Partitioning Analysis = 67%. 
+Model 4 Neural Network = 71%.  
+  
+Therefore, Model 4 (Neural Network) is the most accurate classifier.
+
+
+## Comparing consistancy
+
+To determine which classifier is most consistent, we need to compare the train accuracy and test accuracy of each model. If the difference between the train accuracy and test accuracy is small, it indicates that the model is not overfitting the training data and is generalizing well to new data. 
+
+Looking at the train and test confusion matrices for each model, we can see that Model 4 (Neural Network) has the smallest difference between train accuracy (75%) and test accuracy (71%). Therefore, Model 4 is the most consistent classifier.
+
+
+## Comparing processing speed
+
+To determine which classifier is most suitable when processing speed is most important, we need to compare the model fit time for each model. Looking at the model fit times provided, we can see that Model 2 (Naïve-Bayes Classification) has the shortest model fit time of 0.03721499 seconds. Therefore, Model 2 is the most suitable classifier when processing speed is most important.
+
+
+## Overall best classifier
+
+To determine the best overall classifier, we need to consider all the factors discussed above: accuracy, consistency, processing speed, and minimizing false positives. Based on these factors, we can conclude that Model 4 (Neural Network) is the best overall classifier. It has the highest accuracy and consistency. Although the processesing time is high, but looking at our dataset,the processing time is not relatively very high. While it does not minimizes false positives better than the other models, its accuracy is still competitive with the other models.
+
+
+

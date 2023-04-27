@@ -1,0 +1,401 @@
+---
+title: "Multivariate Linear Regression"
+author: "Varun Bansal"
+output:
+  pdf_document:
+    latex_engine: xelatex
+date: "2023-03-07"
+---
+
+
+## Setting the work directory. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE)
+options(scipen=9)
+knitr::opts_chunk$set(fig.width=9, fig.height=7,
+                      fig.path='Figs/', echo = TRUE)
+#This sets the working directory
+knitr::opts_knit$set(root.dir = 'C:/Users/varun/OneDrive/Desktop/R/datasets')
+
+rm(list = ls())
+
+```
+
+
+## Loading and attaching all the necessary packages.
+
+```{r}
+#Load packages
+
+if(!require(tinytex)){
+  install.packages("tinytex")
+  library("tinytex")
+}
+
+if (!require(lattice)) {
+  install.packages("lattice")
+  library(lattice)
+}
+
+if (!require(gridExtra)) {
+  install.packages("gridExtra")
+  library(gridExtra)
+}
+
+if(!require(corrgram)){install.packages("corrgram")}
+library("corrgram")
+
+if (!require(corrplot)) {
+  install.packages("corrplot")
+  library(corrplot)
+}
+
+```
+
+# Reading file
+
+```{r}
+
+# Reading File
+df <- read.csv("Mail_Order_Delivery_Time.txt", header = TRUE, sep = ",")
+head(df, 5)
+
+```
+
+
+# Preliminary and Exploratory
+
+## Renaming all variables with my initials appended
+
+```{r}
+
+# Appending initials to all variables in the data frame 
+
+df_VB <- df
+colnames(df_VB) <- paste(colnames(df_VB), "VB", sep = "_")
+head(df_VB, 5)
+
+```
+
+## Looking for outliers in the data
+
+Exploring the summary of dataset
+```{r}
+summary(df_VB)
+```
+Most of the columns look fine, but PG Column i.e packages of product have been ordered has a negative value.
+Packages of products ordered cannot be less than 0.
+
+
+### Creating Boxplots
+
+Lets also check this through plotting boxplots.
+
+```{r}
+# Boxplots
+par(mfrow=c(2,3))
+boxplot(df_VB$DL_VB, main = "Time for Delivery")
+boxplot(df_VB$VN_VB, main = "Vintage of Product")
+boxplot(df_VB$PG_VB, main = "Packages of Product")
+boxplot(df_VB$CS_VB, main = "Number of Orders")
+boxplot(df_VB$ML_VB, main = "Distance the Order needs to be delivered")
+boxplot(df_VB$WT_VB, main = "Weight of the shipment")
+par(mfrow=c(1,1))
+```
+
+The box plots show the same, packages of product have been ordered has a negative value
+```{r}
+#Checking the row
+subset(df_VB, PG_VB <0)
+```
+Removing the value
+```{r}
+df_VB <- df_VB[!(df_VB$PG_VB < 0), ]
+```
+
+For other columns there are some outliers, but there is no reason to remove them. For example, some of the packages can be very heavy than the normal packages.
+
+
+## Comparing if one Carrier has faster delivery times than the other
+
+We will use two-sample t-test to compare the average delivery times for each Carrier.
+
+```{r}
+# Two-sample t-test
+t.test(DL_VB ~ CR_VB, data = df_VB)
+```
+Here p-value is significant less than 0.05. This indicates that there is evidence to suggest that one Carrier has faster delivery times than the other.  
+
+On average, the delivery time of Def Post is faster than that of Sup Del. Def Post has an average delivery time of 7.84, while Sup Del has an average delivery time of 8.90.
+
+
+## Splitting the dataframe into a training and a test file
+
+```{r}
+# Choosing the sampling rate
+sr <- 0.8
+
+# Find the number of rows of data
+n.row <- nrow(df_VB)
+
+#Choose the rows for the traning sample 
+
+set.seed(5021)
+training.rows <- sample(1:n.row, sr*n.row, replace=FALSE)
+
+#Assign to the training sample
+
+train_VB <- subset(df_VB[training.rows,])
+
+# Assign the balance to the Test Sample
+
+test_VB <- subset(df_VB[-c(training.rows),])
+```
+
+
+# Simple Linear Regression
+
+## Correlations
+
+Creating the Scatterplot matrix to see relationship between variables.
+```{r}
+
+# Scatterplot matrix
+pairs(df_VB[,-c(6,7,8)])
+```
+From the scatter plots, there looks to be a relationship between 'Time for delivery' and 'Packages of product have been ordered'. Also there is a weak relationship between 'Time for delivery' and 'Weight of the shipment'.  
+  
+  
+Checking the correlation between variables using cor() function.
+```{r}
+correlations <- cor(df_VB[,-c(6,7,8)])
+correlations
+```
+The correlation function confirms that there is a relationship between 'Time for delivery' and 'Packages of product have been ordered'. Also there is a weak relationship between 'Time for delivery' and 'Weight of the shipment'.  
+  
+  
+Creating visual representation of Correlation between varibales.
+```{r}
+corrgram(df_VB, order=TRUE, lower.panel=panel.shade,
+         upper.panel=panel.pie, text.panel=panel.txt,
+         main="Correlations")
+```
+
+
+## Creating Simple Linear Regression model using time for delivery as the dependent variable and weight of the shipment as the independent.
+
+Creating simple linear regression model using time for delivery as the dependent variable and weight of the shipment as the independent.
+```{r}
+SLR_DL_WT <- lm(DL_VB ~ WT_VB, data=train_VB)
+SLR_DL_WT
+```
+
+  
+  
+Creating Scatter plot
+```{r}
+plot(DL_VB ~ WT_VB, data=train_VB,
+     main="Time for delivery by weight of the shipment(with Regression Line)")
+abline(SLR_DL_WT)
+```
+
+
+## Creating Simple Linear Regression model using time for delivery as the dependent variable and distance the shipment needs to travel as the independent
+
+Creating simple linear regression model using time for delivery as the dependent variable and distance the shipment needs to travel as the independent.
+```{r}
+SLR_DL_ML <- lm(DL_VB ~ ML_VB, data=train_VB)
+SLR_DL_ML
+```
+
+  
+  
+Creating Scatter Plot
+```{r}
+plot(DL_VB ~ ML_VB, data=train_VB,
+     main="Time for delivery by distance the order needs to be delivered(with Regression Line)")
+abline(SLR_DL_ML)
+```
+
+## Comparing the models using F-Stat, 𝑅2, RMSE for train and test.
+
+### RMSE For Model 1
+
+```{r}
+pred <- predict(SLR_DL_WT, newdata=train_VB)
+
+RMSE_trn <- sqrt(mean((train_VB$DL_VB - pred)^2))
+print(paste("RSME for SLR_DL_WT training dataset: ", round(RMSE_trn,3)))
+
+RMSE_test <- sqrt(mean((test_VB$DL_VB - pred)^2))
+print(paste("RSME for SLR_DL_WT test dataset: ", round(RMSE_test,3)))
+
+```
+
+### RMSE For Model 2
+```{r}
+
+pred <- predict(SLR_DL_ML, newdata=train_VB)
+
+RMSE_trn <- sqrt(mean((train_VB$DL_VB - pred)^2))
+print(paste("RSME for SLR_DL_ML train dataset: ", round(RMSE_trn,3)))
+
+RMSE_test <- sqrt(mean((test_VB$DL_VB - pred)^2))
+print(paste("RSME for SLR_DL_ML test dataset: ", round(RMSE_test,3)))
+
+```
+
+### Summary of Model 1
+```{r}
+summary(SLR_DL_WT)
+```
+
+### Summary of Model 2
+```{r}
+summary(SLR_DL_ML)
+```
+### Comparing the models
+
+Model 1:
+
+Multiple R-squared: 0.1665  
+Adjusted R-squared: 0.1643  
+F-statistic: 77.1 on 1 and 386 DF  
+p-value: < 2.2e-16  
+  
+  
+Model 2:  
+
+Multiple R-squared: 0.0233  
+Adjusted R-squared: 0.02077  
+F-statistic: 9.207 on 1 and 386 DF  
+p-value: 0.002574
+
+Model 1 has an adjusted R-squared of 0.1643 and a residual standard error of 1.632, while Model 2 has an adjusted R-squared of 0.02077 and a residual standard error of 1.767.
+Model 1 has a higher Multiple R-squared and a lower p-value compared to Model 2. 
+The lower residual standard error of model 1 indicates that the model's predictions are more accurate
+
+Therefore, we can conclude that Model 1 is more superior than Model 2.
+
+
+# Model Development – Multivariate
+
+## Multivariate model using all variables
+
+```{r}
+MLR_DL_full_VB <- lm(DL_VB ~ . , data=train_VB, na.action=na.omit )
+MLR_DL_full_VB
+
+```
+
+```{r}
+summary(MLR_DL_full_VB)
+
+```
+ 
+R-squared value is 0.5192, which is moderate.
+The residual standard error is 1.251.
+Significance tests of the individual coefficients indicate that only five of the independent variables have statistically significant effects on the dependent variable. 
+  
+  
+Calculating RSME For Training and Test for Model 1
+
+```{r}
+pred <- predict(MLR_DL_full_VB, newdata=train_VB)
+
+RMSE_trn <- sqrt(mean((train_VB$DL_VB - pred)^2))
+print(paste("RSME for MLR_DL_full_VB training dataset: ", round(RMSE_trn,3)))
+
+RMSE_test <- sqrt(mean((test_VB$DL_VB - pred)^2))
+print(paste("RSME for MLR_DL_full_VB test dataset: ", round(RMSE_test,3)))
+
+```
+RMSE for the test dataset is higher than that for the training dataset, which suggests that the model might be overfitting slightly.  
+
+
+## Multivariate model using backward selection
+
+```{r}
+MLR_DL_backward_VB = step(MLR_DL_full_VB, direction="backward", details=TRUE)
+```
+
+
+```{r}
+summary(MLR_DL_backward_VB)
+```
+R-squared value is 0.5189, which is moderate.
+The residual standard error is 1.25.
+Significance tests of the individual coefficients indicate that only five of the independent variables have statistically significant effects on the dependent variable. 
+
+  
+Calculating RSME For Training and Test for Model 2
+```{r}
+pred <- predict(MLR_DL_backward_VB, newdata=train_VB)
+
+RMSE_trn <- sqrt(mean((train_VB$DL_VB - pred)^2))
+print(paste("RSME for MLR_DL_backward_VB training dataset: ", round(RMSE_trn,3)))
+
+RMSE_test <- sqrt(mean((test_VB$DL_VB - pred)^2))
+print(paste("RSME for MLR_DL_backward_VB test dataset: ", round(RMSE_test,3)))
+```
+RMSE for the test dataset is higher than that for the training dataset, which suggests that the model might be overfitting slightly. 
+
+
+# Model Evaluation – Verifying Assumptions - Multivariate
+
+## Model Evaluation - Multivariate Model using all the variables.
+```{r}
+par(mfrow = c(2, 2))  
+plot(MLR_DL_full_VB)  
+par(mfrow = c(1, 1)) 
+```
+
+## Observation for Multivariate Model using all the variables.
+
+Residual vs Fitted plot:
+The residuals are randomly scattered around the zero line, with no distinct pattern or trend suggesting mean of zero
+
+Normal Q-Q plot:
+Te points fall close to the diagonal line, suggesting the residuals to be normally distributed.
+
+Scale-Location plot:
+The points are randomly scattered around a horizontal line, suggesting the variance of the residuals is constant, which is good for a linear model.
+
+Residual vs Leverage plot:
+Observations that fall outside the dashed lines (Cook's distance) are considered influential and should be examined closely, but here we can barely see Cook’s distance lines because all cases are well inside of the Cook’s distance line.
+
+## Model Evaluation - Multivariate Model using backward selection.
+
+```{r}
+par(mfrow = c(2, 2))  
+plot(MLR_DL_backward_VB)  
+par(mfrow = c(1, 1)) 
+```
+
+## Observation for Multivariate Model using all the variables.
+
+Residual vs Fitted plot:
+The residuals are randomly scattered around the zero line, with no distinct pattern or trend suggesting mean of zero
+
+Normal Q-Q plot:
+Te points fall close to the diagonal line, suggesting the residuals to be normally distributed.
+
+Scale-Location plot:
+The points are randomly scattered around a horizontal line, suggesting the variance of the residuals is constant, which is good for a linear model.
+
+Residual vs Leverage plot:
+Observations that fall outside the dashed lines (Cook's distance) are considered influential and should be examined closely, but here we can barely see Cook’s distance lines because all cases are well inside of the Cook’s distance line.
+
+
+# Final Recommendation - Multivariate
+
+Both models meet the regression assumptions and perform similarly in terms of RMSE on the training and test datasets. The corrected R-squared value of Model 2 is marginally higher, indicating that it explains more variance in the response variable. 
+
+Also model 2 gets rid of 1 variable i.e. VN(Vintage of product), which was not significantly related to the outcome variable.  
+
+As a result, I advise using Model 2 to make predictions and draw conclusions.
+
+
+
+

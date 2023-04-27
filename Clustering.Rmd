@@ -1,0 +1,327 @@
+---
+title: "Data Analysis - Clustering"
+author: "Varun Bansal"
+output: pdf_document
+date: "2023-02-15"
+---
+
+
+## Setting the work directory. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE)
+options(scipen=9)
+knitr::opts_chunk$set(fig.width=9, fig.height=7,
+                      fig.path='Figs/', echo = TRUE)
+#This sets the working directory
+knitr::opts_knit$set(root.dir = 'C:/Users/varun/OneDrive/Desktop/R/datasets')
+
+rm(list = ls())
+
+```
+
+
+## Loading and attaching all the necessary packages.
+
+```{r}
+#Load packages
+
+if(!require(tinytex)){
+  install.packages("tinytex")
+  library("tinytex")
+}
+
+if (!require(lattice)) {
+  install.packages("lattice")
+  library(lattice)
+}
+
+if (!require(gridExtra)) {
+  install.packages("gridExtra")
+  library(gridExtra)
+}
+
+```
+
+# Data Transformation
+
+```{r}
+
+# Reading File
+df <- read.csv("Expense_Summary.txt", header = TRUE, sep = ",")
+head(df, 5)
+
+```
+
+## Renaming all variables with my initials appended
+
+```{r}
+
+# Appending initials to all variables in the data frame 
+
+df_VB <- df
+colnames(df_VB) <- paste(colnames(df_VB), "VB", sep = "_")
+head(df_VB, 5)
+
+```
+
+## Standardizing the variables
+
+Before we do standardization, lets look at the summary of data.
+
+```{r}
+summary(df_VB)
+```
+There doesn't seem to be much of outliers.  
+Lets do the Shapiro-Wilk test to check for normality.
+
+```{r}
+shapiro.test(df_VB$Food_VB)
+shapiro.test(df_VB$Enter_VB)
+shapiro.test(df_VB$Edu_VB)
+shapiro.test(df_VB$Trans_VB)
+shapiro.test(df_VB$Work_VB)
+shapiro.test(df_VB$House_VB)
+shapiro.test(df_VB$Oth_VB)
+```
+
+Here in all the test, p-value is less than 0.05.
+So data is not normally distributed.
+
+Also our data has a bounded range, so we will use min-max standardization function.  
+  
+  
+Using min-max standardization function
+```{r}
+
+# min-max standardization function
+
+norm01 <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+```
+
+
+```{r}
+
+# performing min-max standardization function on all the variables
+
+df_VB$Food_Norm01_VB <- norm01(df_VB$Food_VB)
+df_VB$Enter_Norm01_VB <- norm01(df_VB$Enter_VB)
+df_VB$Edu_Norm01_VB <- norm01(df_VB$Edu_VB)
+df_VB$Trans_Norm01_VB <- norm01(df_VB$Trans_VB)
+df_VB$Work_Norm01_VB <- norm01(df_VB$Work_VB)
+df_VB$House_Norm01_VB <- norm01(df_VB$House_VB)
+df_VB$Oth_Norm01_VB <- norm01(df_VB$Oth_VB)
+
+```
+```{r}
+head(df_VB,3)
+```
+
+
+
+#  Descriptive Data Analysis
+## Graphical summaries of the data 
+
+Exploring the Data using boxplots.
+```{r}
+
+par(mfrow=c(2,2))
+
+for (i in 1:7) {
+  if (is.numeric(df_VB[,i])) {
+      boxplot(df_VB[i], main=names(df_VB)[i],
+              horizontal=TRUE, pch=10,
+              col= 27)
+  }
+}
+
+```
+
+```{r}
+par(mfrow=c(1,1))
+```
+
+The box plot suggests that there are not many outliners in the dataset.
+
+Now lets density plot and see if data is normally distributed.
+
+```{r}
+
+dp1 <- densityplot( ~ df_VB$Food_VB, pch=10, main='Food_VB')
+dp2 <- densityplot( ~ df_VB$Enter_VB, pch=10, main='Enter_VB')
+dp3 <- densityplot( ~ df_VB$Edu_VB, pch=10, main='Edu_VB')
+dp4 <- densityplot( ~ df_VB$Trans_VB, pch=10, main='Trans_VB')
+dp5 <- densityplot( ~ df_VB$Work_VB, pch=10, main='Work_VB')
+dp6 <- densityplot( ~ df_VB$House_VB, pch=10, main='House_VB')
+dp7 <- densityplot( ~ df_VB$Oth_VB, pch=10, main='Oth_VB')
+
+# Display the plots in a grid
+grid.arrange(dp1, dp2, dp3, dp4, dp5, dp6, dp7, ncol = 2)
+
+```
+
+
+This also suggests data is not normally distributed.
+
+
+# 3. Clustering  
+# Using the K-Means procedure clustering
+
+Setting Up for Clusters
+```{r}
+
+# Creating Variable for Elbow Chart
+# Creating 2 to 7 Clusters
+
+maxk <- 7   # max number of k
+
+nk <- c(2:maxk) # list of numbers 2 to 7
+
+wss <- rep(0,maxk-1)  # empty list having 7 zeros
+```
+
+  
+  
+Creating Clusters
+```{r}
+
+# Setting Clusters 2 to 7
+
+for(k in 2:7){
+  
+  ClstrIncome_VB <- kmeans(df_VB[,c(8,13)], iter.max=10, centers=k, nstart=10)
+  
+  cat("****************  k = ",k, " *******************\n\n")
+  cat("Cluster size: ", ClstrIncome_VB$size, "\n\n")
+  cat("Cluster Centers: \n")
+  print(ClstrIncome_VB$centers)
+  cat("\nRatio of between-cluster variance to total variance ", 
+      ClstrIncome_VB$betweenss/ClstrIncome_VB$totss)
+  cat("\n\n---------------------------------------------------------------\n\n")
+  
+  df_with_k <- paste("df_VB", k, sep="_")
+  df_VB$cluster <- factor(ClstrIncome_VB$cluster)   # Adding Cluster tags to variables
+  assign(df_with_k, df_VB)
+  
+  centers <- paste("centers", k, sep="_")
+  
+  # the data frame and assign it to the name
+  assign(centers, data.frame(cluster=factor(1:k), ClstrIncome_VB$centers))  
+  wss[k-1] <- ClstrIncome_VB$tot.withinss
+}
+```
+
+\
+
+## 3. Creating the WSS plots
+
+Plotting 'Elbow' chart
+```{r}
+
+plot(2:maxk, wss,
+     type="b", 
+     pch = 15, 
+     col="blue",
+     frame = FALSE,
+     main="Elbow Chart for Clusters",
+     xlab="Values of K",
+     ylab="Total Within-Clusters SS",
+     ylim=c(0,max(wss)))
+```
+
+Looking at the elbow chart, there seems to be a bend at 4.  
+So we choose the value of k as 4.
+
+#  Evaluation of Clusters
+## Plotting the clusters
+
+We have choosen k=4.  
+Plotting the clusters for k=3, k=4, k=5
+```{r}
+
+# K=3
+
+plot(df_VB_3$House_Norm01_VB, df_VB_3$Food_Norm01_VB,
+     col=df_VB_3$cluster, pch=as.numeric(df_VB_3$cluster),
+     main = "k = 3",
+     xlab= "House",
+     ylab = "Food")
+
+points(centers_3$House_Norm01_VB, centers_3$Food_Norm01_VB,
+    col=centers_3$cluster, 
+    pch=as.numeric(centers_3$cluster),
+    cex=3, lwd=3)
+
+# K=4
+
+plot(df_VB_4$House_Norm01_VB, df_VB_4$Food_Norm01_VB,
+     col=df_VB_4$cluster, pch=as.numeric(df_VB_4$cluster),
+     main = "k = 4",
+     xlab= "House",
+     ylab = "Food")
+
+points(centers_4$House_Norm01_VB, centers_4$Food_Norm01_VB,
+    col=centers_4$cluster, 
+    pch=as.numeric(centers_4$cluster),
+    cex=3, lwd=3)
+
+
+# K=5
+
+plot(df_VB_5$House_Norm01_VB, df_VB_5$Food_Norm01_VB,
+     col=df_VB_5$cluster, pch=as.numeric(df_VB_5$cluster),
+     main = "k = 5",
+     xlab= "House",
+     ylab = "Food")
+
+points(centers_5$House_Norm01_VB, centers_5$Food_Norm01_VB,
+    col=centers_5$cluster,
+    pch=as.numeric(centers_5$cluster),
+    cex=3, lwd=3)
+
+
+```
+
+\
+
+Looking at the WSS plot and the charts, at k = 3, clusters look the best and well segregated.  
+
+
+## Summarizing the Clusters
+```{r}
+
+# Creating summary report
+
+SumClusters_VB <- aggregate(
+  cbind(Food_VB, Enter_VB, Edu_VB, Trans_VB, Work_VB, House_VB, Oth_VB) ~ cluster, 
+  df_VB_3, 
+  FUN = mean)
+
+SumClusters_VB
+
+```
+
+
+## Suitable descriptive names for each cluster.
+
+For cluster 1: High on transport and housing, negligible on education and entertainment.
+
+For cluster 2: High on housing, low on entertainment and education.
+
+For cluster 3: High on education, negligible on work.
+
+
+## Uses for this clustering scheme.
+
+There can be many uses of this clustering scheme. Some of them are- 
+
+This scheme may come handy in making business strategies. For example, if a company primarily sells products related to housing and transportation, they may want to expand their offerings to appeal to customers in cluster 1.
+Similarly, if a company is developing a new product related to education, they may want to focus on customers in cluster 3, who are likely to spend more in this area.
+
+This clustering scheme may also help government in there policy-making. They can identify areas where public spending should be prioritized. For example, if cluster 3 represents a large portion of the population, policymakers may want to invest more resources into education to meet the needs of this group. 
+This may also help the government to analyse why people are not willing to spend on education in Cluster 1 and 
+
+
